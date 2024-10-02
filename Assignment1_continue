@@ -1,4 +1,13 @@
 #6. AFTER CREATING RESOURCE SET BACKEND STATE FILE FROM S3 TO LOCAL.
+aws s3 cp s3://jrstatefile/terraform.tfstate ./local-terraform.tfstate
+
+terraform {
+  backend "local" {
+    path = "local-terraform.tfstate"
+  }
+}
+
+
 resource "local_file" "state_file" {
   content  = file("${path.module}/terraform.tfstate")
   filename = "${path.module}/local-terraform.tfstate"
