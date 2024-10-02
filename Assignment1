@@ -1,0 +1,86 @@
+/* 1. CREATE A VPC, SUBNET, IGW, ROUTE-TABLE AND ATTACH TO SERVER.
+2. SERVER NEED TO CREATE ON US-EAST-1B AZ.
+3. SERVER NEED TO HAVE KEY-PAIR WHICH GENERTED BY TLS PROVIDER.
+4. PROVIDER VERSIONS (AWS=5.68.0, TLS=4.0.5, LOCAL=2.5.0)
+5. STATEFILE MUST BE ON S3 BUCKET.*/
+
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "5.68.0"
+    }
+    tls = {
+      source  = "hashicorp/tls"
+      version = "4.0.5"
+    }
+    local = {
+      source  = "hashicorp/local"
+      version = "2.5.0"
+    }
+  }
+
+  backend "s3" {
+    bucket = "jrstatefile"
+    key    = "terraform.tfstate"
+    region = "us-east-1"  # Updated to match the actual region
+  }
+}
+
+provider "aws" {
+  region = "us-east-1"
+}
+
+provider "tls" {}
+
+provider "local" {}
+
+resource "aws_vpc" "main" {
+  cidr_block = "10.0.0.0/16"
+}
+
+resource "aws_subnet" "main" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.1.0/24"
+  availability_zone = "us-east-1b"
+}
+
+resource "aws_internet_gateway" "main" {
+  vpc_id = aws_vpc.main.id
+}
+
+resource "aws_route_table" "main" {
+  vpc_id = aws_vpc.main.id
+}
+
+resource "aws_route_table_association" "main" {
+  subnet_id      = aws_subnet.main.id
+  route_table_id = aws_route_table.main.id
+}
+
+resource "aws_instance" "server" {
+  ami           = "ami-0ebfd941bbafe70c6" # Example AMI ID
+  instance_type = "t2.micro"
+  subnet_id     = aws_subnet.main.id
+
+  key_name = aws_key_pair.generated_key.key_name
+
+  tags = {
+    Name = "MyServer"
+  }
+}
+
+resource "tls_private_key" "example" {
+  algorithm = "RSA"
+  rsa_bits  = 4096
+}
+
+resource "aws_key_pair" "generated_key" {
+  key_name   = "generated-key"
+  public_key = tls_private_key.example.public_key_openssh
+}
+
+
+output "instance_id" {
+  value = aws_instance.server.id
+}
